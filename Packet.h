@@ -7,4 +7,5 @@ struct Packet {
     std::string protocol;
     std::string payload;
     bool        is_malicious;
+    bool        is_admin = false;
 };

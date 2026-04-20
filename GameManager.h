@@ -8,6 +8,8 @@ enum class ActionResult {
     FalsePositive,    // drop  + safe      → mistake   ( -5 pts)
     AcceptedSafe,     // accept + safe     → correct   ( +5 pts)
     AcceptedThreat,   // accept + malicious→ breach    (-20  hp)
+    AdminBlocked,     // drop  + admin     → big error (-50 pts)
+    ExitCommand,      // "quit" typed      → graceful exit
     UnknownCommand,
 };
 
@@ -64,6 +66,7 @@ public:
     // Clears active_packet on a valid command. Returns UnknownCommand if
     // no active packet or unrecognized input (does NOT clear active_packet).
     ActionResult on_action(const std::string& cmd) {
+        if (cmd == "quit") { running = false; return ActionResult::ExitCommand; }
         if (!active_packet) return ActionResult::UnknownCommand;
 
         const Packet& pkt = *active_packet;
@@ -72,7 +75,11 @@ public:
         std::string src = pkt.source_ip + ":" + std::to_string(pkt.port);
 
         if (cmd == "drop") {
-            if (pkt.is_malicious) {
+            if (pkt.is_admin) {
+                score = std::max(0, score - 50);
+                set_message("ADMIN KICKED!       >> " + src + "  [-50 PTS]", false);
+                res = ActionResult::AdminBlocked;
+            } else if (pkt.is_malicious) {
                 add_score(15);
                 set_message("THREAT PURGED       >> " + src + "  [+15 PTS]", true);
                 res = ActionResult::BlockedThreat;

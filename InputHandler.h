@@ -16,6 +16,8 @@ public:
         if (thread_.joinable()) thread_.detach();
     }
 
+    void stop() { running_ = false; if (thread_.joinable()) thread_.join(); }
+
     InputHandler(const InputHandler&)            = delete;
     InputHandler& operator=(const InputHandler&) = delete;
 

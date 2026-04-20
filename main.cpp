@@ -73,8 +73,10 @@ int main() {
                         [](const PacketLogEntry& e){ return !e.handled && !e.leaked; });
                     if (it != log.end()) it->handled = true;
                 } else {
-                    gm.set_message("UNKNOWN CMD: type  accept  or  drop", false);
+                    gm.set_message("UNKNOWN CMD: accept / drop / quit", false);
                 }
+            } else if (cmd == "quit") {
+                gm.on_action(cmd);
             } else {
                 gm.set_message("NO ACTIVE PACKET IN QUEUE", false);
             }
@@ -106,7 +108,8 @@ int main() {
             std::this_thread::sleep_for(TICK_DURATION - elapsed);
     }
 
+    input.stop();
     ConsoleRenderer::draw_game_over(gm);
-    std::getchar();
+    int k; do { k = _getch(); } while (k != 27 && k != '\r');
     return 0;
 }

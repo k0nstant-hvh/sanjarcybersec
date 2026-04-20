@@ -29,6 +29,7 @@ public:
         SetConsoleMode(h, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
         SetConsoleOutputCP(65001);
 #endif
+        std::fputs("\033[?25l", stdout);
     }
 
     static void clear() { std::fputs("\033[2J\033[H", stdout); }
@@ -93,6 +94,7 @@ public:
     }
 
     static void draw_game_over(const GameManager& gm) {
+        std::fputs("\033[?25h", stdout);
         clear();
         std::fputs(C_RED C_BOLD, stdout);
         std::puts("\n\n  +====================================+");
