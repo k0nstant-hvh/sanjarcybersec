@@ -59,6 +59,9 @@ private:
                 if (!buf_.empty()) { cmds_.push(buf_); buf_.clear(); }
             } else if ((ch == 8 || ch == 127) && !buf_.empty()) { // Backspace
                 buf_.pop_back();
+            } else if (ch == '1') { cmds_.push("cmd_force_sql");   // director hotkeys — buf_ untouched
+            } else if (ch == '2') { cmds_.push("cmd_force_admin");
+            } else if (ch == '3') { cmds_.push("cmd_force_junk");
             } else if (ch >= 32 && ch <= 126 && buf_.size() < 16) {
                 buf_ += static_cast<char>(ch);
             }

@@ -8,6 +8,8 @@
 #include <iomanip>
 #include "Packet.h"
 
+enum class ForceNext { None, SQL, Admin, Junk };
+
 struct PacketLogEntry {
     Packet pkt;
     int threat_score;
@@ -35,8 +37,17 @@ public:
         return (int)std::chrono::duration_cast<std::chrono::milliseconds>(next_packet_time_ - now).count();
     }
 
+    void force_next(ForceNext f) { force_next_ = f; }
+
     Packet generate() {
         schedule_next();
+        if (force_next_ != ForceNext::None) {
+            ForceNext f = force_next_;
+            force_next_ = ForceNext::None;
+            if (f == ForceNext::SQL)   return make_forced_sql();
+            if (f == ForceNext::Admin) return make_admin();
+            if (f == ForceNext::Junk)  return make_junk();
+        }
         int r = roll(100);
         if (r < 30) return make_legitimate();
         if (r < 48) return make_malicious();
@@ -74,6 +85,7 @@ private:
     std::chrono::steady_clock::time_point next_packet_time_;
     int current_wave_ = 1;
     float difficulty_multiplier_ = 1.0f;
+    ForceNext force_next_ = ForceNext::None;
 
     int roll(int max) { return std::uniform_int_distribution<int>(0, max - 1)(rng_); }
 
@@ -184,6 +196,11 @@ private:
         };
         const auto& e = entries[roll((int)std::size(entries))];
         return {ips[roll((int)std::size(ips))], e.port, e.proto, e.payload, false};
+    }
+
+    Packet make_forced_sql() {
+        static const char* ips[] = {"192.168.6.6", "185.220.101.5", "31.220.3.157", "104.18.255.9", "1.34.56.78"};
+        return {ips[roll((int)std::size(ips))], 4444, "TCP", gen_sql_payload(), true};
     }
 
     Packet make_malicious() {

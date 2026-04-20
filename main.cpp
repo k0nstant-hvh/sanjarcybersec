@@ -64,7 +64,10 @@ int main() {
         // ── Command input ─────────────────────────────────────────────────
         std::string cmd;
         if (input.poll(cmd)) {
-            if (gm.active_packet != nullptr) {
+            if      (cmd == "cmd_force_sql")   { gen.force_next(ForceNext::SQL);   }
+            else if (cmd == "cmd_force_admin") { gen.force_next(ForceNext::Admin); }
+            else if (cmd == "cmd_force_junk")  { gen.force_next(ForceNext::Junk);  }
+            else if (gm.active_packet != nullptr) {
                 Packet       pkt_snap = *gm.active_packet;
                 ActionResult res      = gm.on_action(cmd);   // sets gm.last_action_msg
 
