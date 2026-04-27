@@ -8,21 +8,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Building
 
-This is a Windows-only project (uses `<conio.h>` and Win32 console APIs). Compile with MSVC:
+Requires [Raylib](https://www.raylib.com/) (header + static lib). Windows-only.
 
+MSVC (with Raylib in the include/lib path):
 ```bash
-cl /std:c++17 /EHsc /O2 main.cpp /Fe:sanjar.exe
+cl /std:c++17 /EHsc /O2 main.cpp raylib.lib gdi32.lib winmm.lib shell32.lib /Fe:sanjar.exe
 ```
 
-Or with MinGW/g++ on Windows:
-
+MinGW/g++:
 ```bash
-g++ -std=c++17 -O2 main.cpp -o sanjar.exe
+g++ -std=c++17 -O2 main.cpp -lraylib -lopengl32 -lgdi32 -lwinmm -o sanjar.exe
 ```
 
-A pre-built `sanjar.exe` and `main.obj` are checked in to the repo. There are no external dependencies, no build system, and no tests.
+No build system. No tests. `InputHandler.h` and `ConsoleRenderer.h` are legacy console files — not compiled in the current build.
 
 ## Architecture
+
+Rendering is done with Raylib (1280×720, 60 FPS, vsync). Game logic runs on a 20 TPS cadence inside the Raylib loop. `InputHandler.h` (legacy `_kbhit`/`_getch` thread) is unused; input is now read via `GetCharPressed()`/`IsKeyPressed()` on the main thread.
 
 Everything lives in header-only classes (no `.cpp` besides `main.cpp`):
 
@@ -31,9 +33,9 @@ Everything lives in header-only classes (no `.cpp` besides `main.cpp`):
 | `Packet.h` | Plain data struct (`source_ip`, `port`, `protocol`, `payload`, `is_malicious`) |
 | `PacketGenerator.h` | Spawns packets on a random timer; `heuristic_threat_score()` adds intentional noise ("lying AI") that grows with wave number |
 | `GameManager.h` | Owns game state (score, health, wave, active packet); resolves `accept`/`drop` commands via `on_action()` |
-| `InputHandler.h` | Background thread reads keystrokes via `_kbhit`/`_getch`; pushes completed commands to a mutex-protected queue |
-| `ConsoleRenderer.h` | All rendering; uses ANSI escape codes, enabled on Windows via `ENABLE_VIRTUAL_TERMINAL_PROCESSING` |
-| `main.cpp` | Game loop at 20 TPS; orchestrates spawn → input → render cycle |
+| `InputHandler.h` | Legacy: background thread via `_kbhit`/`_getch` — not used in current Raylib build |
+| `ConsoleRenderer.h` | Legacy: ANSI console renderer — not used in current Raylib build |
+| `main.cpp` | Raylib loop at 60 FPS; game tick at 20 TPS; `DrawDesktop` → `DrawWallpaper` + `DrawTaskbar` |
 
 ### Game loop flow
 
