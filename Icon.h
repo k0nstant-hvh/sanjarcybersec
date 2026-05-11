@@ -8,6 +8,8 @@ struct Icon {
     std::string name;
     Rectangle   bounds;   // tile rect (label is drawn below the tile)
     Color       color;
+    bool        dragging = false;
+    Vector2     drag_off = {};   // offset from bounds origin at press time
 };
 
 static void DrawSingleIcon(const Icon& icon, bool hovered) {

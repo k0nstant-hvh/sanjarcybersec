@@ -3,6 +3,12 @@
 #include <algorithm>
 #include "Packet.h"
 
+struct GameSettings {
+    float difficulty = 1.5f;
+    float spawn_rate = 0.8f;
+    bool  dev_mode   = false;
+};
+
 enum class ActionResult {
     BlockedThreat,    // drop  + malicious → correct   (+15 pts)
     FalsePositive,    // drop  + safe      → mistake   ( -5 pts)
@@ -18,6 +24,7 @@ public:
     int     score         = 0;
     int     health        = 100;
     int     current_wave  = 1;
+    bool    dev_mode      = false;
     int     packets_seen  = 0;
     bool    running       = true;
     Packet* active_packet = nullptr;   // points to active_storage_, or null

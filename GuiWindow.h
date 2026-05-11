@@ -16,9 +16,12 @@ enum class WinHit { None, Body, Close };
 class GuiWindow {
 public:
     std::string title;
-    std::string bodyText; // Добавили поле для контента
+    std::string bodyText;
     Rectangle   bounds;
-    bool        open = true;
+    bool        open             = true;
+    double      load_finish_time = 0.0;   // content hidden until GetTime() passes this
+
+    bool is_loading() const { return GetTime() < load_finish_time; }
 
     // Обновили конструктор, чтобы он принимал текст (по умолчанию пустой)
     GuiWindow(const std::string& t, float x, float y, 
@@ -72,7 +75,8 @@ public:
                  14, WHITE);
 
         DrawCloseButton();
-        DrawContent(focused);
+        if (is_loading()) DrawLoadingContent();
+        else              DrawContent(focused);
     }
 
 protected:
@@ -86,6 +90,14 @@ protected:
 private:
     bool    dragging_ = false;
     Vector2 drag_off_ = {};
+
+    void DrawLoadingContent() const {
+        float cx    = bounds.x + bounds.width  / 2.0f;
+        float cy    = bounds.y + WIN_TITLE_H + (bounds.height - WIN_TITLE_H) / 2.0f;
+        float angle = fmodf((float)GetTime() * 240.0f, 360.0f);
+        DrawRing({cx, cy}, 14.0f, 22.0f, angle,          angle + 250.0f, 24, {30, 120, 215, 220});
+        DrawRing({cx, cy}, 14.0f, 22.0f, angle + 250.0f, angle + 360.0f, 12, {30, 120, 215,  55});
+    }
 
     Rectangle CloseRect() const {
         return {bounds.x + bounds.width - WIN_CLOSE_W, bounds.y,

@@ -29,6 +29,10 @@ public:
         difficulty_multiplier_ = 1.0f + (wave - 1) * 0.25f;
     }
 
+    void apply_settings(float difficulty, float spawn_rate) {
+        settings_mult_ = difficulty * spawn_rate;
+    }
+
     bool ready(std::chrono::steady_clock::time_point now) const { return now >= next_packet_time_; }
 
     int ms_until_next() const {
@@ -49,14 +53,15 @@ public:
             if (f == ForceNext::Junk)  return make_junk();
         }
         int r = roll(100);
-        if (r < 30) return make_legitimate();
-        if (r < 48) return make_malicious();
-        if (r < 63) return make_web_attack();
-        if (r < 75) return make_anomaly();
-        if (r < 83) return make_junk();
-        if (r < 91) return make_admin();       // 8%  — scary payload, safe
-        if (r < 96) return make_red_herring(); // 5%  — wrong port, safe
-        return make_zero_day();                // 4%  — clean port, malicious
+        if (r < 28) return make_legitimate();   // 28%
+        if (r < 44) return make_malicious();    // 16%
+        if (r < 57) return make_web_attack();   // 13%
+        if (r < 67) return make_xss();          // 10% — XSS injection, malicious
+        if (r < 77) return make_anomaly();      // 10%
+        if (r < 83) return make_junk();         //  6%
+        if (r < 91) return make_admin();        //  8% — scary payload, safe
+        if (r < 96) return make_red_herring();  //  5% — wrong port, safe
+        return make_zero_day();                 //  4% — clean port, malicious
     }
 
     int heuristic_threat_score(const Packet& p) {
@@ -83,15 +88,17 @@ public:
 private:
     std::mt19937 rng_;
     std::chrono::steady_clock::time_point next_packet_time_;
-    int current_wave_ = 1;
+    int   current_wave_          = 1;
     float difficulty_multiplier_ = 1.0f;
-    ForceNext force_next_ = ForceNext::None;
+    float settings_mult_         = 1.2f;   // difficulty × spawn_rate from GameSettings
+    ForceNext force_next_        = ForceNext::None;
 
     int roll(int max) { return std::uniform_int_distribution<int>(0, max - 1)(rng_); }
 
     void schedule_next() {
-        int min_ms = std::max(500,  (int)(2500 / difficulty_multiplier_));
-        int max_ms = std::max(1000, (int)(5500 / difficulty_multiplier_));
+        float eff    = difficulty_multiplier_ * settings_mult_;
+        int   min_ms = std::max(500,  (int)(2500.0f / eff));
+        int   max_ms = std::max(1000, (int)(5500.0f / eff));
         std::uniform_int_distribution<int> dist(min_ms, max_ms);
         next_packet_time_ = std::chrono::steady_clock::now() + std::chrono::milliseconds(dist(rng_));
     }
@@ -264,6 +271,16 @@ private:
         };
         const auto& e = entries[roll((int)std::size(entries))];
         return {ips[roll((int)std::size(ips))], e.port, e.proto, e.payload, true};
+    }
+
+    Packet make_xss() {
+        static const char* payloads[] = {
+            "<script>alert(1)</script>",
+            "<img src=x onerror=steal()>",
+            "<svg/onload=cmd()>",
+        };
+        static const char* ips[] = {"10.0.0.6", "192.168.6.6", "31.220.3.157"};
+        return {ips[roll(3)], 80, "HTTP", payloads[roll(3)], true};
     }
 
     Packet make_junk() {

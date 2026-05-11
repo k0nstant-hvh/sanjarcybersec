@@ -1,8 +1,30 @@
 #pragma once
+
+// 1. Raylib first — types and function declarations are locked in.
 #include "raylib.h"
 #include "GuiWindow.h"
 #include "GameManager.h"
 #include "PacketGenerator.h"
+
+// 2. Rename Windows symbols BEFORE including windows.h so their declarations
+//    land under WIN_* names instead of colliding with Raylib's.
+#define CloseWindow WIN_CloseWindow
+#define ShowCursor  WIN_ShowCursor
+#define Rectangle   WIN_Rectangle
+#define DrawText    WIN_DrawText
+#define DrawTextEx  WIN_DrawTextEx
+
+#define NOGDI
+#include <windows.h>
+#include <mmsystem.h>   // PlaySoundA, MessageBeep — winmm.lib already linked
+
+// 3. Remove the rename macros — all subsequent code uses Raylib's versions.
+//    Windows equivalents remain accessible via the WIN_* aliases if needed.
+#undef CloseWindow
+#undef ShowCursor
+#undef Rectangle
+#undef DrawText
+#undef DrawTextEx
 
 #include <chrono>
 #include <deque>
@@ -15,14 +37,17 @@
 // Type 'start.exe' inside to activate the packet-defense game loop.
 class VirtualTerminal : public GuiWindow {
 public:
-    VirtualTerminal(float x, float y);
+    VirtualTerminal(float x, float y, GameSettings* settings = nullptr);
     ~VirtualTerminal() override;
 
-    // Called every frame for the focused window — handles text input.
     void HandleInput() override;
-
-    // Called every Raylib frame; internally ticks the game at 20 TPS.
     void UpdateGame(std::chrono::steady_clock::time_point now);
+
+    bool HasGameJustEnded() { bool v = game_over_fired_; game_over_fired_ = false; return v; }
+
+    int    GetFinalScore()     const { return gm_.score; }
+    int    GetFinalWaves()     const { return gm_.current_wave - 1; }
+    double GetSurviveSeconds() const { return survive_seconds_; }
 
 protected:
     void DrawContent(bool focused) const override;
@@ -40,14 +65,18 @@ private:
 
     std::vector<Line>                      lines_;
     std::string                            input_buf_;
-    bool                                   game_active_ = false;
-    bool                                   font_owned_  = false;
+    bool                                   game_active_      = false;
+    bool                                   game_over_fired_  = false;
+    bool                                   font_owned_       = false;
     Font                                   term_font_;
 
     GameManager                            gm_;
     PacketGenerator                        gen_;
     std::deque<PacketLogEntry>             pkt_log_;
     std::chrono::steady_clock::time_point  last_tick_;
+    GameSettings*                          settings_         = nullptr;
+    double                                 game_start_time_  = 0.0;
+    double                                 survive_seconds_  = 0.0;
 
     void AddLine(const std::string& text, Color color = WHITE);
     void ProcessCommand(const std::string& cmd);
@@ -56,9 +85,10 @@ private:
 
 // ── Implementation (header-only, single translation unit) ─────────────────
 
-inline VirtualTerminal::VirtualTerminal(float x, float y)
+inline VirtualTerminal::VirtualTerminal(float x, float y, GameSettings* settings)
     : GuiWindow("SANJAR Alpha Terminal", x, y, "", 640.0f, 420.0f)
     , last_tick_(std::chrono::steady_clock::now())
+    , settings_(settings)
 {
     // Attempt to load Consolas; fall back to Raylib default if not found.
     term_font_  = LoadFontEx("C:\\Windows\\Fonts\\consola.ttf",
@@ -113,10 +143,12 @@ inline void VirtualTerminal::ProcessCommand(const std::string& cmd) {
             return;
         }
         if (cmd == "start.exe") {
-            game_active_ = true;
+            game_active_     = true;
+            game_start_time_ = GetTime();
             AddLine("[INIT] Launching packet defense engine...", {0, 200, 255, 255});
             AddLine("[INIT] Network traffic monitor active.", {0, 200, 255, 255});
             AddLine("---------------------------------------------", {45, 50, 65, 255});
+            PlaySoundA("SystemStart", NULL, SND_ALIAS | SND_ASYNC);
         } else if (cmd == "help") {
             AddLine("  Commands: start.exe", {175, 175, 175, 255});
         } else {
@@ -140,6 +172,8 @@ inline void VirtualTerminal::ProcessCommand(const std::string& cmd) {
             auto it = std::find_if(pkt_log_.begin(), pkt_log_.end(),
                 [](const PacketLogEntry& e){ return !e.handled && !e.leaked; });
             if (it != pkt_log_.end()) it->handled = true;
+            if (res == ActionResult::AdminBlocked)   MessageBeep(MB_ICONEXCLAMATION);
+            else if (res == ActionResult::AcceptedThreat) MessageBeep(MB_ICONHAND);
         }
     } else if (cmd == "quit") {
         gm_.on_action(cmd);
@@ -170,6 +204,10 @@ inline void VirtualTerminal::UpdateGame(std::chrono::steady_clock::time_point no
     last_tick_ = now;
 
     gm_.tick_message();
+    if (settings_) {
+        gen_.apply_settings(settings_->difficulty, settings_->spawn_rate);
+        gm_.dev_mode = settings_->dev_mode;
+    }
 
     if (gen_.ready(now)) {
         Packet pkt = gen_.generate();
@@ -197,7 +235,10 @@ inline void VirtualTerminal::UpdateGame(std::chrono::steady_clock::time_point no
     }
 
     if (!gm_.is_alive()) {
-        game_active_ = false;
+        game_active_     = false;
+        game_over_fired_ = true;
+        survive_seconds_ = GetTime() - game_start_time_;
+        MessageBeep(MB_ICONSTOP);
         AddLine("=============================================", {210, 50, 50, 255});
         AddLine("  SYSTEM COMPROMISED  --  GAME OVER",         {210, 50, 50, 255});
         AddLine("  Final Score : " + std::to_string(gm_.score)
