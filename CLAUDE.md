@@ -17,7 +17,7 @@ cl /std:c++17 /EHsc /O2 /I raylib_lib\include main.cpp raylib_lib\lib\raylib.lib
 
 MinGW/g++:
 ```
-g++ -std=c++17 -O2 -I raylib_lib/include main.cpp -L raylib_lib/lib -lraylib -lopengl32 -lgdi32 -lwinmm -o sanjar.exe
+g++ main.cpp -o sanjar.exe -I./include -L./lib -lraylib -lopengl32 -lgdi32 -lwinmm -static -static-libgcc -static-libstdc++ -mwindows
 ```
 
 No build system. No tests. `InputHandler.h` and `ConsoleRenderer.h` are legacy console files — not compiled in the current build.
